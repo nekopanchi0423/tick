@@ -28,6 +28,15 @@ function shareText(result: GameResult): string {
   return `⏳ ${target}秒チャレンジ\n誤差 ${err}秒\n世界${result.rank.toLocaleString()}位 / ${result.total.toLocaleString()}人中（${percentile}）\n称号: ${result.title}\nあなたは何ms？ → ${window.location.origin}\n#TICK #体内時計`
 }
 
+function drawDivider(ctx: CanvasRenderingContext2D, y: number, W: number) {
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(80, y)
+  ctx.lineTo(W - 80, y)
+  ctx.stroke()
+}
+
 async function generateScoreCard(result: GameResult): Promise<Blob> {
   await document.fonts.ready
 
@@ -38,7 +47,6 @@ async function generateScoreCard(result: GameResult): Promise<Blob> {
   canvas.height = H
   const ctx = canvas.getContext('2d')!
 
-  const BG = '#080810'
   const SURFACE = '#0f0f1a'
   const ACCENT = '#c8953a'
   const TEXT = '#ffffff'
@@ -47,7 +55,7 @@ async function generateScoreCard(result: GameResult): Promise<Blob> {
   const MONO = "'JetBrains Mono', monospace"
 
   // 背景
-  ctx.fillStyle = BG
+  ctx.fillStyle = '#080810'
   ctx.fillRect(0, 0, W, H)
 
   // 外枠
@@ -55,110 +63,106 @@ async function generateScoreCard(result: GameResult): Promise<Blob> {
   ctx.lineWidth = 2
   ctx.strokeRect(48, 48, W - 96, H - 96)
 
+  ctx.textAlign = 'center'
+  // y は常にテキスト上端を指す。CJK文字はラテン文字より上下に大きく
+  // 広がるため、ベースライン基準だと間隔がズレやすい → top基準に統一する
+  ctx.textBaseline = 'top'
+
+  let y = 96
+
   // TICK ロゴ
   ctx.fillStyle = TEXT
-  ctx.font = `700 80px ${MONO}`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'alphabetic'
-  ctx.fillText('TICK', W / 2, 180)
+  ctx.font = `700 72px ${MONO}`
+  ctx.fillText('TICK', W / 2, y)
+  y += 90
 
   // モードラベル
   ctx.fillStyle = DIM
   ctx.font = `300 26px ${MONO}`
-  ctx.fillText(`${(result.targetMs / 1000).toFixed(3)} second challenge`, W / 2, 230)
+  ctx.fillText(`${(result.targetMs / 1000).toFixed(3)} second challenge`, W / 2, y)
+  y += 56
 
-  // 区切り線
-  ctx.strokeStyle = BORDER
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(80, 268)
-  ctx.lineTo(W - 80, 268)
-  ctx.stroke()
+  drawDivider(ctx, y, W)
+  y += 50
 
   // スコアグリッド
-  const gridStartY = 360
-  const rowGap = 110
   const color = errorColor(result.errorMs)
   const sign = result.actualMs >= result.targetMs ? '+' : '-'
-
   const rows = [
     { label: 'TARGET', value: formatMs(result.targetMs), color: TEXT },
     { label: 'YOURS',  value: formatMs(result.actualMs), color },
     { label: 'ERROR',  value: `${sign}${(result.errorMs / 1000).toFixed(4)}`, color },
   ]
+  const valueFontSize = 56
 
-  rows.forEach((row, i) => {
-    const y = gridStartY + i * rowGap
+  rows.forEach((row) => {
+    const labelOffset = (valueFontSize - 22) / 2
 
+    ctx.textAlign = 'left'
     ctx.fillStyle = DIM
     ctx.font = `400 22px ${MONO}`
-    ctx.textAlign = 'left'
-    ctx.fillText(row.label, 100, y)
+    ctx.fillText(row.label, 100, y + labelOffset)
 
-    ctx.fillStyle = row.color
-    ctx.font = `700 58px ${MONO}`
     ctx.textAlign = 'right'
+    ctx.fillStyle = row.color
+    ctx.font = `700 ${valueFontSize}px ${MONO}`
     ctx.fillText(row.value, W - 160, y)
 
+    ctx.textAlign = 'left'
     ctx.fillStyle = DIM
     ctx.font = `300 22px ${MONO}`
-    ctx.textAlign = 'left'
-    ctx.fillText('sec', W - 140, y)
-  })
+    ctx.fillText('sec', W - 140, y + labelOffset)
 
-  // 区切り線
-  const divY = gridStartY + rows.length * rowGap + 10
-  ctx.strokeStyle = BORDER
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(80, divY)
-  ctx.lineTo(W - 80, divY)
-  ctx.stroke()
+    y += 78
+  })
+  ctx.textAlign = 'center'
+
+  drawDivider(ctx, y, W)
+  y += 55
 
   // PB バッジ
-  let rankY = divY + 110
   if (result.isPersonalBest) {
+    const badgeH = 50
     ctx.strokeStyle = ACCENT
     ctx.fillStyle = 'rgba(200,149,58,0.1)'
     ctx.lineWidth = 1
-    roundRect(ctx, W / 2 - 140, rankY - 120, 280, 44, 4)
+    roundRect(ctx, W / 2 - 150, y, 300, badgeH, 6)
     ctx.fill()
     ctx.stroke()
     ctx.fillStyle = ACCENT
-    ctx.font = `400 20px ${MONO}`
-    ctx.textAlign = 'center'
-    ctx.fillText('★ PERSONAL BEST', W / 2, rankY - 90)
-    rankY += 10
+    ctx.font = `400 22px ${MONO}`
+    ctx.fillText('★ PERSONAL BEST', W / 2, y + (badgeH - 22) / 2)
+    y += badgeH + 40
   }
 
-  // 順位
+  // 順位（CJK文字のため十分な余白を確保）
   ctx.fillStyle = TEXT
-  ctx.font = `700 130px ${MONO}`
-  ctx.textAlign = 'center'
-  ctx.fillText(`${result.rank.toLocaleString()}位`, W / 2, rankY)
+  ctx.font = `700 110px ${MONO}`
+  ctx.fillText(`${result.rank.toLocaleString()}位`, W / 2, y)
+  y += 140
 
+  // 何人中
   ctx.fillStyle = DIM
   ctx.font = `300 28px ${MONO}`
-  ctx.fillText(`${result.total.toLocaleString()}人中`, W / 2, rankY + 50)
+  ctx.fillText(`${result.total.toLocaleString()}人中`, W / 2, y)
+  y += 70
 
   // 称号バッジ
-  const badgeY = rankY + 130
+  const titleBadgeH = 64
   ctx.fillStyle = SURFACE
   ctx.strokeStyle = BORDER
   ctx.lineWidth = 1
-  roundRect(ctx, W / 2 - 220, badgeY - 42, 440, 62, 31)
+  roundRect(ctx, W / 2 - 220, y, 440, titleBadgeH, 32)
   ctx.fill()
   ctx.stroke()
   ctx.fillStyle = TEXT
   ctx.font = `400 28px ${MONO}`
-  ctx.textAlign = 'center'
-  ctx.fillText(result.title, W / 2, badgeY)
+  ctx.fillText(result.title, W / 2, y + (titleBadgeH - 28) / 2 - 2)
 
-  // URL
+  // URL（下端に固定）
   ctx.fillStyle = 'rgba(255,255,255,0.25)'
   ctx.font = `300 22px ${MONO}`
-  ctx.textAlign = 'center'
-  ctx.fillText(window.location.hostname, W / 2, H - 72)
+  ctx.fillText(window.location.hostname, W / 2, H - 90)
 
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'))
 }

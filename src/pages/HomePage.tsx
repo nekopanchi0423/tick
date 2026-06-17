@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Mode, RankingEntry } from '../types'
 import { MODE_LABELS } from '../types'
-import { getDisplayName, setDisplayName, isNameLocked } from '../lib/token'
+import { getDisplayName, setDisplayName, isInputLocked, isNameLocked, hasSetName } from '../lib/token'
 import { fetchRanking } from '../lib/api'
 import { toFlag } from '../lib/flag'
 
@@ -29,7 +29,8 @@ export function HomePage({ onStart, onHome, onRanking, totalPlays }: Props) {
   const [name, setName] = useState(getDisplayName)
   const [ranking, setRanking] = useState<RankingEntry[]>([])
   const [rankTotal, setRankTotal] = useState(0)
-  const locked = isNameLocked()
+  const locked = isInputLocked()          // 名前ありでロック済み → 入力不可
+  const playedAnonymous = isNameLocked() && !hasSetName() // 無記名プレイ済み → 入力可
 
   useEffect(() => {
     fetchRanking(selected, 'all', 10, 0)
@@ -43,7 +44,13 @@ export function HomePage({ onStart, onHome, onRanking, totalPlays }: Props) {
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (locked) return
     setName(e.target.value)
-    setDisplayName(e.target.value)
+    // localStorage への書き込みは START 時まで遅らせる
+    // （途中で hasSetName() が true になりロックされるのを防ぐ）
+  }
+
+  function handleStart() {
+    if (!locked) setDisplayName(name) // START直前に確定保存
+    onStart(selected)
   }
 
   return (
@@ -79,11 +86,14 @@ export function HomePage({ onStart, onHome, onRanking, totalPlays }: Props) {
           disabled={locked}
         />
         {locked && (
-          <p className="name-locked-hint">🔒 name is locked for this session</p>
+          <p className="name-locked-hint">🔒 name is locked</p>
+        )}
+        {playedAnonymous && (
+          <p className="name-locked-hint name-anonymous-hint">名前を入力できます（一度設定すると変更不可）</p>
         )}
       </div>
 
-      <button className="btn-main" onClick={() => onStart(selected)}>
+      <button className="btn-main" onClick={handleStart}>
         START
       </button>
 

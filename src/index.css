@@ -262,6 +262,10 @@ html, body {
   text-align: center;
   margin-top: 0.4rem;
 }
+.name-anonymous-hint {
+  color: var(--accent);
+  opacity: 0.8;
+}
 
 /* ─── Social proof ─── */
 .social-proof {

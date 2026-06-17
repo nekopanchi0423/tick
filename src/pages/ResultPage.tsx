@@ -20,10 +20,161 @@ function errorColor(errorMs: number): string {
 
 function shareText(result: GameResult): string {
   const target = (result.targetMs / 1000).toFixed(3)
-  const actual = formatMs(result.actualMs)
   const sign = result.actualMs >= result.targetMs ? '+' : '-'
   const err = `${sign}${(result.errorMs / 1000).toFixed(4)}`
-  return `${target}秒に挑戦 → 実測 ${actual}秒（誤差 ${err}秒）\n世界 ${result.rank.toLocaleString()}位 / ${result.total.toLocaleString()}人\n称号: ${result.title}\n#TICK\nhttps://tick.pages.dev`
+  const percentile = result.total > 1
+    ? `上位${((result.rank / result.total) * 100).toFixed(1)}%`
+    : '世界1位🏆'
+  return `⏳ ${target}秒チャレンジ\n誤差 ${err}秒\n世界${result.rank.toLocaleString()}位 / ${result.total.toLocaleString()}人中（${percentile}）\n称号: ${result.title}\nあなたは何ms？ → ${window.location.origin}\n#TICK #体内時計`
+}
+
+async function generateScoreCard(result: GameResult): Promise<Blob> {
+  await document.fonts.ready
+
+  const W = 1080
+  const H = 1080
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+
+  const BG = '#080810'
+  const SURFACE = '#0f0f1a'
+  const ACCENT = '#c8953a'
+  const TEXT = '#ffffff'
+  const DIM = 'rgba(255,255,255,0.45)'
+  const BORDER = 'rgba(255,255,255,0.08)'
+  const MONO = "'JetBrains Mono', monospace"
+
+  // 背景
+  ctx.fillStyle = BG
+  ctx.fillRect(0, 0, W, H)
+
+  // 外枠
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(48, 48, W - 96, H - 96)
+
+  // TICK ロゴ
+  ctx.fillStyle = TEXT
+  ctx.font = `700 80px ${MONO}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText('TICK', W / 2, 180)
+
+  // モードラベル
+  ctx.fillStyle = DIM
+  ctx.font = `300 26px ${MONO}`
+  ctx.fillText(`${(result.targetMs / 1000).toFixed(3)} second challenge`, W / 2, 230)
+
+  // 区切り線
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(80, 268)
+  ctx.lineTo(W - 80, 268)
+  ctx.stroke()
+
+  // スコアグリッド
+  const gridStartY = 360
+  const rowGap = 110
+  const color = errorColor(result.errorMs)
+  const sign = result.actualMs >= result.targetMs ? '+' : '-'
+
+  const rows = [
+    { label: 'TARGET', value: formatMs(result.targetMs), color: TEXT },
+    { label: 'YOURS',  value: formatMs(result.actualMs), color },
+    { label: 'ERROR',  value: `${sign}${(result.errorMs / 1000).toFixed(4)}`, color },
+  ]
+
+  rows.forEach((row, i) => {
+    const y = gridStartY + i * rowGap
+
+    ctx.fillStyle = DIM
+    ctx.font = `400 22px ${MONO}`
+    ctx.textAlign = 'left'
+    ctx.fillText(row.label, 100, y)
+
+    ctx.fillStyle = row.color
+    ctx.font = `700 58px ${MONO}`
+    ctx.textAlign = 'right'
+    ctx.fillText(row.value, W - 160, y)
+
+    ctx.fillStyle = DIM
+    ctx.font = `300 22px ${MONO}`
+    ctx.textAlign = 'left'
+    ctx.fillText('sec', W - 140, y)
+  })
+
+  // 区切り線
+  const divY = gridStartY + rows.length * rowGap + 10
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(80, divY)
+  ctx.lineTo(W - 80, divY)
+  ctx.stroke()
+
+  // PB バッジ
+  let rankY = divY + 110
+  if (result.isPersonalBest) {
+    ctx.strokeStyle = ACCENT
+    ctx.fillStyle = 'rgba(200,149,58,0.1)'
+    ctx.lineWidth = 1
+    roundRect(ctx, W / 2 - 140, rankY - 120, 280, 44, 4)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = ACCENT
+    ctx.font = `400 20px ${MONO}`
+    ctx.textAlign = 'center'
+    ctx.fillText('★ PERSONAL BEST', W / 2, rankY - 90)
+    rankY += 10
+  }
+
+  // 順位
+  ctx.fillStyle = TEXT
+  ctx.font = `700 130px ${MONO}`
+  ctx.textAlign = 'center'
+  ctx.fillText(`${result.rank.toLocaleString()}位`, W / 2, rankY)
+
+  ctx.fillStyle = DIM
+  ctx.font = `300 28px ${MONO}`
+  ctx.fillText(`${result.total.toLocaleString()}人中`, W / 2, rankY + 50)
+
+  // 称号バッジ
+  const badgeY = rankY + 130
+  ctx.fillStyle = SURFACE
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 1
+  roundRect(ctx, W / 2 - 220, badgeY - 42, 440, 62, 31)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = TEXT
+  ctx.font = `400 28px ${MONO}`
+  ctx.textAlign = 'center'
+  ctx.fillText(result.title, W / 2, badgeY)
+
+  // URL
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'
+  ctx.font = `300 22px ${MONO}`
+  ctx.textAlign = 'center'
+  ctx.fillText(window.location.hostname, W / 2, H - 72)
+
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'))
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
 }
 
 export function ResultPage({ result, onRetry, onRanking, onHome }: Props) {
@@ -33,6 +184,28 @@ export function ResultPage({ result, onRetry, onRanking, onHome }: Props) {
   function handleShare() {
     const url = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText(result))}`
     window.open(url, '_blank', 'noopener')
+  }
+
+  async function handleScoreCard() {
+    const blob = await generateScoreCard(result)
+    const file = new File([blob], 'tick-score.png', { type: 'image/png' })
+
+    // モバイルは Web Share API で画像+テキストを一緒にシェア
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text: shareText(result) })
+      return
+    }
+
+    // デスクトップは画像をダウンロード → X を開く
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'tick-score.png'
+    a.click()
+    URL.revokeObjectURL(url)
+    setTimeout(() => {
+      window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(shareText(result))}`, '_blank', 'noopener')
+    }, 300)
   }
 
   return (
@@ -84,8 +257,11 @@ export function ResultPage({ result, onRetry, onRanking, onHome }: Props) {
         <button className="btn-main btn-retry" onClick={onRetry}>
           もう一度
         </button>
+        <button className="btn-share btn-scorecard" onClick={handleScoreCard}>
+          📷 スコアカードを保存 / シェア
+        </button>
         <button className="btn-share" onClick={handleShare}>
-          𝕏 で共有
+          𝕏 で共有（テキストのみ）
         </button>
         <button className="btn-text" onClick={onRanking}>
           ランキングを見る →

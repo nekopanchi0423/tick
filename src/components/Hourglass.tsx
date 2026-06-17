@@ -2,9 +2,9 @@ import type { Mode } from '../types'
 
 const MODE_SIZE: Record<Mode, number> = {
   '3s': 100,
-  '30s': 140,
-  '300s': 200,
-  '3600s': 260,
+  '30s': 112,
+  '300s': 124,
+  '3600s': 136,
 }
 
 interface Props {

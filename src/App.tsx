@@ -16,6 +16,7 @@ export function App() {
   const [result, setResult] = useState<GameResult | null>(null)
   const [totalPlays, setTotalPlays] = useState(0)
   const [error, setError] = useState('')
+  const [sessionReady, setSessionReady] = useState(false)
   const sessionIdRef = useRef<string>('')
 
   useEffect(() => {
@@ -33,13 +34,15 @@ export function App() {
   async function handleStart(selectedMode: Mode) {
     setError('')
     setMode(selectedMode)
+    setSessionReady(false)
+    setScreen('game') // 即座に画面遷移（STOPはセッション確立まで無効）
     try {
       const token = getGuestToken()
       const name = getDisplayName()
       const sessionId = await startGame(selectedMode, token, name)
       sessionIdRef.current = sessionId
       lockName()
-      setScreen('game')
+      setSessionReady(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
       if (msg === 'name_rejected') {
@@ -47,6 +50,7 @@ export function App() {
       } else {
         setError(msg || 'エラーが発生しました')
       }
+      setScreen('home')
     }
   }
 
@@ -73,7 +77,7 @@ export function App() {
         <HomePage onStart={handleStart} totalPlays={totalPlays} onHome={goHome} onRanking={() => setScreen('ranking')} />
       )}
       {screen === 'game' && (
-        <GamePage mode={mode} onStop={handleStop} onHome={goHome} />
+        <GamePage mode={mode} onStop={handleStop} onHome={goHome} sessionReady={sessionReady} />
       )}
       {screen === 'result' && result && (
         <ResultPage

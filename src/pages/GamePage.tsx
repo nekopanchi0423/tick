@@ -6,9 +6,17 @@ interface Props {
   mode: Mode
   onStop: () => void
   onHome: () => void
+  sessionReady: boolean
 }
 
-export function GamePage({ mode, onStop, onHome }: Props) {
+export function GamePage({ mode, onStop, onHome, sessionReady }: Props) {
+  function handleStop(e: React.PointerEvent) {
+    e.preventDefault()
+    if (!sessionReady) return
+    if (navigator.vibrate) navigator.vibrate(12)
+    onStop()
+  }
+
   return (
     <div className="page game-page">
       <button className="logo logo-btn dim" onClick={onHome}>TICK</button>
@@ -23,7 +31,10 @@ export function GamePage({ mode, onStop, onHome }: Props) {
         <Hourglass mode={mode} />
       </div>
 
-      <button className="btn-main btn-stop" onClick={onStop}>
+      <button
+        className={`btn-main btn-stop${sessionReady ? '' : ' btn-stop-loading'}`}
+        onPointerDown={handleStop}
+      >
         STOP
       </button>
     </div>

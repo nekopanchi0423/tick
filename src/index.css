@@ -4,6 +4,13 @@
   padding: 0;
 }
 
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 :root {
   --bg: #080810;
   --surface: #0f0f1a;
@@ -48,6 +55,11 @@ html, body {
   gap: 2rem;
   padding: 2rem 1.5rem;
   min-height: 100dvh;
+}
+
+.game-page {
+  justify-content: flex-start;
+  padding-top: 4rem;
 }
 
 /* ─── Logo ─── */
@@ -158,8 +170,25 @@ html, body {
   border: 1px solid rgba(255,255,255,0.4);
   padding: 1.2rem 4rem;
   font-size: 1.1rem;
+  will-change: transform;
 }
 .btn-stop:hover { background: rgba(255,255,255,0.06); }
+.btn-stop:active {
+  transform: scale(0.92);
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.8);
+}
+
+.btn-stop-loading {
+  pointer-events: none;
+  opacity: 0.35;
+  animation: stop-loading 0.9s ease-in-out infinite;
+}
+
+@keyframes stop-loading {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 0.5; }
+}
 
 .btn-retry {
   background: none;
@@ -181,6 +210,10 @@ html, body {
   transition: opacity 0.15s;
 }
 .btn-share:hover { opacity: 0.88; }
+.btn-scorecard {
+  background: var(--accent);
+  color: var(--bg);
+}
 
 .btn-text {
   background: none;
